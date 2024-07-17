@@ -1,2 +1,2 @@
-codedir = '/Users/wenbinlu/Documents/GitHub/dustecho/'
+codedir = '/home/nityanigam/tdesurf/dustecho'
 savedir = codedir
