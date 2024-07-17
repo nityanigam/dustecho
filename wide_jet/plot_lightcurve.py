@@ -2,6 +2,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 import matplotlib
 import sys
+import re
 
 CUSTOM_PLOT_STYLE = {
     "text.usetex": True,
@@ -26,7 +27,26 @@ CUSTOM_PLOT_STYLE = {
 matplotlib.rcdefaults()
 matplotlib.rcParams.update(CUSTOM_PLOT_STYLE)
 
+# Define the regular expression pattern
+pattern = r'nH[0-9\.e\+\-]+_lam([0-9\.e\+\-]+)um_theobs([0-9\.e\+\-]+)_Ldnu_xcentr\.txt'
+
+# Function to extract values from filename
+def extract_values(filename):
+    match = re.match(pattern, filename)
+    if match:
+        lam = float(match.group(1))
+        theobs = float(match.group(2))
+        return lam, theobs
+    else:
+        return None, None
+
 def main(filename):
+
+    if filename.endswith('.txt'):
+        lam, theobs = extract_values(filename)
+        if lam is not None and theobs is not None:
+            print(f'Filename: {filename}, lam: {lam}, theobs: {theobs}')
+    
     with open(filename, 'r') as file:
         first_line = file.readline()
         first_row_data = first_line.split()[3:]
@@ -62,12 +82,13 @@ def main(filename):
     ax2.tick_params(axis='y')
     
     # Add a title and show the plot
+    plt.title("$\\lambda = $"+str(lam)+"$\\mu$m, $\\theta_{obs}=$"+str(theobs))
     fig.tight_layout()  # Ensure the plot layout is tidy
-    
     plt.show()   
 
-    plt.savefig('plot.png')
-     
+    plotfile="plot_l"+str(lam)+"theobs"+str(theobs)+".png"
+    plt.savefig(plotfile)
+
 if __name__ == "__main__":
     if len(sys.argv) != 2:
         print("Usage: python3 script_file.py data_file.txt")
