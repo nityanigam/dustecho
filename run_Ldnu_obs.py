@@ -13,5 +13,5 @@ for i in range(len(nH0_list)):
         lamobs = lamobs_list[j]
         for k in range(len(theobs_list)):
             theobs = theobs_list[k]
-            os.system('python ' + codedir + 'Ldnu_obs.py ' +
+            os.system('python ' + codedir + '/Ldnu_obs.py ' +
                       '%.1e ' % nH0 + '%.2f ' % lamobs + '%.3f ' % theobs)
