@@ -5,7 +5,7 @@ import numpy as np
 
 nH0_list = [1]        # [cm^-3]
 lamobs_list = [1.14]    # micron
-theobs_list = [20*pi/180]   # radian
+theobs_list = [0]   # radian
 thej_list = pi*np.linspace(0.001, 0.5, 8)   #radian
 
 for i in range(len(nH0_list)):
