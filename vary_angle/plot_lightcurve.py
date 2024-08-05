@@ -3,6 +3,7 @@ from matplotlib import pyplot as plt
 import matplotlib
 import sys
 import re
+import os
 
 CUSTOM_PLOT_STYLE = {
     "text.usetex": True,
@@ -41,7 +42,7 @@ def extract_values(filename):
     else:
         return None, None
 
-def main(filename):
+def get_arrs(filename):
 
     if filename.endswith('.txt'):
         lam, theobs, thej = extract_values(filename)
@@ -51,7 +52,7 @@ def main(filename):
     with open(filename, 'r') as file:
         first_line = file.readline()
         first_row_data = first_line.split()[3:]
-    
+    print(filename)
     # Assign the three floats to variables
     tobsmin, tobsmax, Ntobs = map(float, first_row_data)
     
@@ -67,32 +68,33 @@ def main(filename):
     # Create the logarithmic space with normalized values
     tobs = np.logspace(log_tobsmin, log_tobsmax, num=int(Ntobs), base=10)
 
-    # Initialize the plot
-    fig, ax1 = plt.subplots()
+    return Ldnu_cgs, xcentr_pc, tobs, lam, theobs, thej
+
+def main(directory):
+    fig, ax = plt.subplots()
+    ax.set_xlabel('Time [s]')
+    ax.set_ylabel('$L_{\\nu}$ [cgs]')
     
-    # Plot Ldnu_cgs against tobs on the primary y-axis
-    ax1.set_xlabel('Time [s]')
-    ax1.set_ylabel('$L_{\\nu}$ [cgs]')
-    ax1.plot(tobs, Ldnu_cgs, color='tab:blue')
-    ax1.tick_params(axis='y')
-    
-    # Create a secondary y-axis to plot xcentr_pc
-    ax2 = ax1.twinx()
-    ax2.set_ylabel('Flux centroid position [pc]')
-    ax2.plot(tobs, xcentr_pc, color='tab:red')
-    ax2.tick_params(axis='y')
-    
+    for filename in os.listdir(directory):
+        try:
+            Ldnu_cgs, xcentr_pc, tobs, lam, theobs, thej = get_arrs(filename)
+            ax.plot(tobs, Ldnu_cgs, label=str(thej))
+        except:
+            print("could not plot", filename)
+
     # Add a title and show the plot
-    plt.title("$\\lambda = $"+str(lam)+"$\\mu$m, $\\theta_{obs} = $"+str(theobs)+", $\\theta_{j} = $"+str(thej))
+    plt.title("$\\lambda = $"+str(lam)+"$\\mu$m, $\\theta_{obs} = $"+str(theobs))
+    ax.set_xlim(0, 6e9)
+    plt.legend()
     fig.tight_layout()  # Ensure the plot layout is tidy
     plt.show()   
 
-    plotfile="plot_l"+str(lam)+"theobs"+str(theobs)+"thej"+str(thej)+".png"
+    plotfile="plot_l"+str(lam)+"theobs"+str(theobs)+".png"
     plt.savefig(plotfile)
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
-        print("Usage: python3 script_file.py data_file.txt")
+        print("Usage: python3 script_file.py directory_path")
     else:
-        filename = sys.argv[1]
-        main(filename)
+        directory = sys.argv[1]
+        main(directory)
