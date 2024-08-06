@@ -91,9 +91,10 @@ def jdnu_intp(t, j_r, j_the, jdnuarr):
 
 
 # compute cumulative number of H as a function of radius and angle
-Nr_fine = int(Nr*10)
-Nthe_fine = int(Nthe*10)
-rarr_fine = np.logspace(log10(rmin/10), log10(rmax), Nr_fine)
+fine_grid = 10
+Nr_fine = int(Nr*fine_grid)
+Nthe_fine = int(Nthe*fine_grid)
+rarr_fine = np.logspace(log10(rmin/fine_grid), log10(rmax), Nr_fine)
 thearr_fine = np.linspace(themin, themax, Nthe_fine)
 r_ratio_fine = rarr_fine[1]/rarr_fine[0]
 Dthe_fine = thearr_fine[1]-thearr_fine[0]
@@ -111,6 +112,7 @@ for i in range(Nthe_fine):
     rthe_NH_intp = interp1d(rarr_fine, NHarr_fine[i], fill_value='extrapolate')
     interp_fns[i] = rthe_NH_intp
 
+"""
 num_NH = 500
 NH_vals = np.linspace(0, np.amax(NHarr_fine), num_NH)
 R_grid = np.zeros((Nthe_fine, num_NH), dtype=float)
@@ -119,6 +121,7 @@ for i in range(Nthe_fine):
         R_grid[i][j] = interp_fns[i](NH_vals[j])
 
 r_NH_intp = RegularGridInterpolator((thearr_fine, NH_vals), R_grid, fill_value=None)
+"""
 
 # compute cumulative number of ionizing photons as a function of time
 Nt_fine = int(Nt*20)
@@ -203,7 +206,7 @@ for i in range(Nt):
         t = tarr[i]
         the = thearr[k]
         Nion = Nion_t_intp((t, the))
-        rion = r_NH_intp((the, Nion))  # ionization radius
+        rion = interp_fns[int(k*fine_grid)](Nion)  # ionization radius
         taudarr.fill(0)    # first iteration, no dust extinction
         calculate_all_T(t, i, rion, Tarr, asubarr, taudarr)
         frac_diff = 1.  # convergence criterion
