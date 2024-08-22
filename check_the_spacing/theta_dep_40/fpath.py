@@ -1,2 +1,2 @@
-codedir = '/home/nityanigam/tdesurf/dustecho/theta_dep_new/'
+codedir = '/home/nityanigam/tdesurf/dustecho/check_the_spacing/theta_dep_40/'
 savedir = codedir

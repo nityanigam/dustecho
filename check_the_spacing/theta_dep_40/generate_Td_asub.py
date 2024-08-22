@@ -32,7 +32,7 @@ r_ratio = rarr[1]/rarr[0]
 
 #THIS IS NEW
 themin, themax = 0.000001, pi/2    #theta array
-Nthe = 10
+Nthe = 40
 thearr = np.linspace(themin, themax, Nthe)
 Dthe = thearr[1]-thearr[0]
 
