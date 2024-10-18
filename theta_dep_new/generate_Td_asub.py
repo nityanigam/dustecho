@@ -224,10 +224,11 @@ for i in range(Nt):
         print('t=%.1f' % t, 'theta=%.2f' % the, '%d iterations' % n_iter)
 
 # write the results into files: Tarr, asubarr
-savelist = ['Td', 'asub']
+savelist = ['Td', 'asub', 'taud', 'jdnu']
+                    
 for i_file in range(len(savelist)):
     fname = 'nH%.1e_' % nH0 + savelist[i_file]
-    with open(savedir+fname + '.txt', 'w') as f:
+    with open(savedir + fname + '.txt', 'w') as f:
         if savelist[i_file] == 'Td':
             f.write('tmin\ttmax\tNt\t%.8e\t%.8e\t%d\tlinear' % (tmin, tmax, Nt))
             f.write('\nthemin\tthemax\tNthe\t%.8e\t%.8e\t%d\tlinear' % (themin, themax, Nthe))
@@ -246,6 +247,7 @@ for i_file in range(len(savelist)):
                                 f.write('%.8e' % Tarr[i, j, k, l])
                             else:
                                 f.write('\t%.8e' % Tarr[i, j, k, l])
+
         elif savelist[i_file] == 'asub':
             f.write('tmin\ttmax\tNt\t%.8e\t%.8e\t%d\tlog' % (tmin, tmax, Nt))
             f.write('\nthemin\tthemax\tNthe\t%.8e\t%.8e\t%d\tlinear' % (themin, themax, Nthe))
@@ -260,3 +262,35 @@ for i_file in range(len(savelist)):
                             f.write('%.8e' % asubarr[i, j, l])
                         else:
                             f.write('\t%.8e' % asubarr[i, j, l])
+
+        elif savelist[i_file] == 'taud':
+            f.write('nu_min\tnu_max\tNnu\t%.8e\t%.8e\t%d\tlog' % (numin, numax, Nnu))
+            f.write('\nthemin\tthemax\tNthe\t%.8e\t%.8e\t%d\tlinear' % (themin, themax, Nthe))
+            f.write('\nrmin\trmax\tNr\t%.8e\t%.8e\t%d\tlog' % (rmin, rmax, Nr))
+            f.write('\n')
+            for m in range(Nnu):
+                f.write('\nm=%d, nu=%.8e' % (m, nuarr[m]))
+                for l in range(Nthe):
+                    f.write('\n')
+                    for j in range(Nr):
+                        if j == 0:
+                            f.write('%.8e' % taudarr[m, j, l])
+                        else:
+                            f.write('\t%.8e' % taudarr[m, j, l])
+
+        elif savelist[i_file] == 'jdnu':
+            f.write('tmin\ttmax\tNt\t%.8e\t%.8e\t%d\tlinear' % (tmin, tmax, Nt))
+            f.write('\nthemin\tthemax\tNthe\t%.8e\t%.8e\t%d\tlinear' % (themin, themax, Nthe))
+            f.write('\nrmin\trmax\tNr\t%.8e\t%.8e\t%d\tlog' % (rmin, rmax, Nr))
+            f.write('\n')
+            for i in range(Nt):
+                t = tarr[i]
+                f.write('\ni=%d, t=%.8e' % (i, t))
+                for l in range(Nthe):
+                    f.write('\n')
+                    for j in range(Nr):
+                        if j == 0:
+                            f.write('%.8e' % jdnuarr[i, j, l])
+                        else:
+                            f.write('\t%.8e' % jdnuarr[i, j, l])
+                    
