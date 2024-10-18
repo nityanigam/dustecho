@@ -14,7 +14,7 @@ tmin = 0.
 n0_over_nH = 1.45e-15    # dust number density over H number density
 lam0 = 2.       # [um] critical wavelength for Qabs_lambda
 #thej = 4*pi/180     # [rad] jet opening angle
-thej = pi
+thej = pi/2
 p = 2.2         # electron PL index => spectrum L_nu ~ nu^{(1-p)/2}
 nuUVmax = 50/const.erg2eV/const.H_PLANCK   # maximum UV frequency 50 eV
 LnuUVmax = (3-p)/2*LUV/nuUVmax   # Lnu at nuUVmax
@@ -190,10 +190,11 @@ for i in range(Nt):
     print('t=%.1f' % t, '%d iterations' % n_iter)
 
 # write the results into files: Tarr, asubarr
-savelist = ['Td', 'asub']
+# write the results into files: Tarr, asubarr, taudarr, jdnuarr
+savelist = ['Td', 'asub', 'taud', 'jdnu']
 for i_file in range(len(savelist)):
     fname = 'nH%.1e_' % nH0 + savelist[i_file]
-    with open(savedir+fname + '.txt', 'w') as f:
+    with open(savedir + fname + '.txt', 'w') as f:
         if savelist[i_file] == 'Td':
             f.write('tmin\ttmax\tNt\t%.8e\t%.8e\t%d\tlinear' % (tmin, tmax, Nt))
             f.write('\nrmin\trmax\tNr\t%.8e\t%.8e\t%d\tlog' % (rmin, rmax, Nr))
@@ -210,7 +211,7 @@ for i_file in range(len(savelist)):
                         else:
                             f.write('\t%.8e' % Tarr[i, j, k])
         elif savelist[i_file] == 'asub':
-            f.write('tmin\ttmax\tNt\t%.8e\t%.8e\t%d\tlog' % (tmin, tmax, Nt))
+            f.write('tmin\ttmax\tNt\t%.8e\t%.8e\t%d\tlinear' % (tmin, tmax, Nt))
             f.write('\nrmin\trmax\tNr\t%.8e\t%.8e\t%d\tlog' % (rmin, rmax, Nr))
             f.write('\n')
             for i in range(Nt):
@@ -220,3 +221,27 @@ for i_file in range(len(savelist)):
                         f.write('%.8e' % asubarr[i, j])
                     else:
                         f.write('\t%.8e' % asubarr[i, j])
+        elif savelist[i_file] == 'taud':
+            f.write('numin\tnumax\tNnu\t%.8e\t%.8e\t%d\tlog' % (numin, numax, Nnu))
+            f.write('\nrmin\trmax\tNr\t%.8e\t%.8e\t%d\tlog' % (rmin, rmax, Nr))
+            f.write('\n')
+            for m in range(Nnu):
+                f.write('\nm=%d, nu=%.8e' % (m, nuarr[m]))
+                for j in range(Nr):
+                    if j == 0:
+                        f.write('%.8e' % taudarr[m, j])
+                    else:
+                        f.write('\t%.8e' % taudarr[m, j])
+        elif savelist[i_file] == 'jdnu':
+            f.write('tmin\ttmax\tNt\t%.8e\t%.8e\t%d\tlinear' % (tmin, tmax, Nt))
+            f.write('\nrmin\trmax\tNr\t%.8e\t%.8e\t%d\tlog' % (rmin, rmax, Nr))
+            f.write('\n')
+            for i in range(Nt):
+                t = tarr[i]
+                f.write('\ni=%d, t=%.8e' % (i, t))
+                for j in range(Nr):
+                    if j == 0:
+                        f.write('%.8e' % jdnuarr[i, j])
+                    else:
+                        f.write('\t%.8e' % jdnuarr[i, j])
+

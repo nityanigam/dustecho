@@ -11,7 +11,7 @@ theobs = float(sys.argv[3])      # [rad] observer's viewing angle wrt. jet axis
 
 # adjustable parameters
 #thej = 4*pi/180     # [rad] jet opening angle
-thej = pi
+thej = pi/2
 
 # fixed ones
 n0_over_nH = 1.45e-15    # dust number density over H number density
