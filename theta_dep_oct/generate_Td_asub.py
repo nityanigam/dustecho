@@ -32,7 +32,7 @@ r_ratio = rarr[1]/rarr[0]
 
 #THIS IS NEW
 themin, themax = 0.000001, pi/2    #theta array
-Nthe = 10
+Nthe = 3
 thearr = np.linspace(themin, themax, Nthe)
 Dthe = thearr[1]-thearr[0]
 
@@ -43,7 +43,7 @@ nuarr = np.logspace(log10(numin), log10(numax), Nnu)    # frequency bins
 nu_ratio = nuarr[1]/nuarr[0]
 
 # jet emission time [dust local frame]
-Nt = 20     # this is the dimension we interpolate over
+Nt = 2     # this is the dimension we interpolate over
 tarr = np.linspace(tmin, tmax, Nt, endpoint=False)
 dt = tarr[1] - tarr[0]
 tarr += dt/2.
@@ -103,14 +103,20 @@ NH = 0.     # total H number
 interp_fns = np.zeros(Nthe_fine, dtype=object)
 for i in range(Nthe_fine):
     NH = 0
+    print(thearr_fine[i])
+    print(Dthe_fine)
+    print(np.sin(thearr_fine[i])*Dthe_fine)
     for j in range(Nr_fine):
         r = rarr_fine[j]
         the = thearr_fine[i]
         dr = r * (sqrt(r_ratio_fine) - 1/sqrt(r_ratio_fine))
-        NH += 2*pi * r*r*np.sin(the)*Dthe_fine*dr*const.pc2cm**3 * func_nH(r, the)
+        NH += 4*pi * r*r*np.sin(the)*Dthe_fine*dr*const.pc2cm**3 * func_nH(r, the)
         NHarr_fine[i][j] = NH
     rthe_NH_intp = interp1d(rarr_fine, NHarr_fine[i], fill_value='extrapolate')
     interp_fns[i] = rthe_NH_intp
+    np.save("NH_"+str(i), NHarr_fine)
+
+
 
 """
 num_NH = 500
@@ -146,6 +152,7 @@ for k in range(Nthe_fine):
             Lion += dnu * func_Lnu(t, nu)/(const.H_PLANCK*nu)
         Nion += Lion*dt_fine * np.sin(the) * Dthe_fine
         Nionarr_fine[i][k] = Nion
+    np.save("Nion_"+str(k), Nionarr_fine[:,k])
 Nion_t_intp = RegularGridInterpolator((tarr_fine, thearr_fine), Nionarr_fine, fill_value=None)
 
 
@@ -222,6 +229,11 @@ for i in range(Nt):
             for j in range(Nr):
                 frac_diff = max(frac_diff, abs(asubarr_old[j, k]/asubarr[i, j, k] - 1))
         print('t=%.1f' % t, 'theta=%.2f' % the, '%d iterations' % n_iter)
+
+for j in range(Nthe):
+    np.save("tauarr"+str(j), taudarr[:,:,j])
+    np.save("Tarr"+str(j), Tarr[:,:,:,j])
+    np.save("asubarr"+str(j), asubarr[:,:,j])
 
 # write the results into files: Tarr, asubarr
 # write the results into files: Tarr, asubarr, taudarr, jdnuarr

@@ -36,7 +36,7 @@ nuarr = np.logspace(log10(numin), log10(numax), Nnu)    # frequency bins
 nu_ratio = nuarr[1]/nuarr[0]
 
 # jet emission time [dust local frame]
-Nt = 20     # this is the dimension we interpolate over
+Nt = 2     # this is the dimension we interpolate over
 tarr = np.linspace(tmin, tmax, Nt, endpoint=False)
 dt = tarr[1] - tarr[0]
 tarr += dt/2.
@@ -95,6 +95,7 @@ for i in range(Nr_fine):
     NH += 4*pi*r*r*dr*const.pc2cm**3 * func_nH(r)
     NHarr_fine[i] = NH
 r_NH_intp = interp1d(rarr_fine, NHarr_fine, fill_value='extrapolate')
+np.save("NHarr", NHarr_fine)
 
 # compute cumulative number of ionizing photons as a function of time
 Nt_fine = int(Nt*20)
@@ -118,7 +119,7 @@ for i in range(Nt_fine):
     Nion += Lion*dt_fine
     Nionarr_fine[i] = Nion
 Nion_t_intp = interp1d(Nionarr_fine, tarr_fine, fill_value='extrapolate')
-
+np.save("Nionarr", Nionarr_fine)
 
 # calculate dust temperature at a given time
 def calculate_all_T(t, i_t, rion, Tarr, asubarr, taudarr):
@@ -189,9 +190,13 @@ for i in range(Nt):
             frac_diff = max(frac_diff, abs(asubarr_old[j]/asubarr[i, j] - 1))
     print('t=%.1f' % t, '%d iterations' % n_iter)
 
+np.save("tauarr", taudarr)
+np.save("Tarr", Tarr)
+np.save("asubarr", asubarr)
+
 # write the results into files: Tarr, asubarr
 # write the results into files: Tarr, asubarr, taudarr, jdnuarr
-savelist = ['Td', 'asub', 'taud', 'jdnu']
+savelist = ['Td', 'asub', 'taud', 'jdnu', 'NHarr']
 for i_file in range(len(savelist)):
     fname = 'nH%.1e_' % nH0 + savelist[i_file]
     with open(savedir + fname + '.txt', 'w') as f:
@@ -244,4 +249,5 @@ for i_file in range(len(savelist)):
                         f.write('%.8e' % jdnuarr[i, j])
                     else:
                         f.write('\t%.8e' % jdnuarr[i, j])
-
+        elif savelist[i_file] == 'ion':
+                    f.write(str(NHarr_fine))
