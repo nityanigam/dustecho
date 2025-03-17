@@ -10,7 +10,7 @@ lamobs = float(sys.argv[2])     # [um] observer's wavelength
 theobs = float(sys.argv[3])      # [rad] observer's viewing angle wrt. jet axis
 
 # adjustable parameters
-thej = 4*pi/180     # [rad] jet opening angle
+thej = pi/2     # [rad] jet opening angle
 
 # fixed ones
 n0_over_nH = 1.45e-15    # dust number density over H number density
@@ -24,22 +24,19 @@ tobsarr = np.logspace(log10(tobsmin), log10(tobsmax), Ntobs)
 Ldnuarr = np.zeros(Ntobs, dtype=float)
 xcentrarr = np.zeros(Ntobs, dtype=float)
 
-
-def func_nH(r):      # gas density profile (r in pc)
+def func_nH(r, the):      # gas density profile (r in pc)
     return nH0
 
-
-def jdnu_intp(t, j_r, jdnuarr, tarr):
+def jdnu_intp(t, j_r, j_the, jdnuarr, tarr):
     # linear interpolation in time for a given r (given by index j_r)
     i_floor = np.argmin(np.abs(t-tarr))
     if t < tarr[i_floor] and i_floor != 0:
         i_floor -= 1
     if i_floor == Nt - 1:
         i_floor -= 1
-    slope = (jdnuarr[i_floor+1, j_r] - jdnuarr[i_floor, j_r])\
+    slope = (jdnuarr[i_floor+1, j_r, j_the] - jdnuarr[i_floor, j_r, j_the])\
             /(tarr[i_floor+1] - tarr[i_floor])
-    return max(jdnuarr[i_floor, j_r] + slope * (t - tarr[i_floor]), 0)
-
+    return max(jdnuarr[i_floor, j_r, j_the] + slope * (t - tarr[i_floor]), 0)
 
 # read the data for Td, asub (generated from 'generate_Td_asub')
 savelist = ['Td', 'asub']   # no need for taud
@@ -52,46 +49,44 @@ for i_file in range(len(savelist)):
             row = f.readline().strip('\n').split('\t')
             rmin, rmax, Nr = float(row[3]), float(row[4]), int(row[5])
             row = f.readline().strip('\n').split('\t')
+            themin, themax, Nthe = float(row[3]), float(row[4]), int(row[5])
+            row = f.readline().strip('\n').split('\t')
             amin, amax, Na = float(row[3]), float(row[4]), int(row[5])
 
-            Tarr = np.zeros((Nt, Nr, Na), dtype=float)
+            Tarr = np.zeros((Nt, Nr, Nthe, Na), dtype=float)
 
             f.readline()    # skip this line
             for i in range(Nt):
                 f.readline()    # skip this line
                 for j in range(Nr):
                     row = f.readline().strip('\n').split('\t')
-                    for k in range(Na):
-                        Tarr[i, j, k] = float(row[k])
-        # elif savelist[i_file] == 'taud':      # this file is not used for echo lightcurve
-        #     row = f.readline().strip('\n').split('\t')
-        #     numin, numax, Nnu = float(row[3]), float(row[4]), int(row[5])
-        #     row = f.readline().strip('\n').split('\t')
-        #     rmin, rmax, Nr = float(row[3]), float(row[4]), int(row[5])
-        #
-        #     taudarr = np.zeros((Nnu, Nr), dtype=float)
-        #
-        #     f.readline()    # skip this line
-        #     for m in range(Nnu):
-        #         row = f.readline().strip('\n').split('\t')
-        #         for j in range(Nr):
-        #             taudarr[m, j] = float(row[j])
+                    for l in range(Nthe):
+                        row = f.readline().strip('\n').split('\t')
+                        for k in range(Na):
+                            Tarr[i, j, l, k] = float(row[k])
         else:   # asubarr
             row = f.readline().strip('\n').split('\t')
             tmin, tmax, Nt = float(row[3]), float(row[4]), int(row[5])
             row = f.readline().strip('\n').split('\t')
             rmin, rmax, Nr = float(row[3]), float(row[4]), int(row[5])
+            row = f.readline().strip('\n').split('\t')
+            themin, themax, Nthe = float(row[3]), float(row[4]), int(row[5])
 
-            asubarr = np.zeros((Nt, Nr), dtype=float)
+            asubarr = np.zeros((Nt, Nr, Nthe), dtype=float)
 
             f.readline()  # skip this line
             for i in range(Nt):
                 row = f.readline().strip('\n').split('\t')
                 for j in range(Nr):
-                    asubarr[i, j] = float(row[j])
+                    row = f.readline().strip('\n').split('\t')
+                    for l in range(Nthe):
+                        asubarr[i, j, l] = float(row[l])
 
 rarr = np.logspace(log10(rmin), log10(rmax), Nr)
 r_ratio = rarr[1]/rarr[0]
+
+thearr = np.linspace(themin, themax, Nthe)
+dthe = thearr[1]-thearr[0]
 
 tarr = np.linspace(tmin, tmax, Nt, endpoint=False)
 dt = tarr[1] - tarr[0]
@@ -100,11 +95,7 @@ tarr += dt/2.
 aarr = np.logspace(log10(amin), log10(amax), Na)
 a_ratio = aarr[1]/aarr[0]
 
-# nuarr = np.logspace(log10(numin), log10(numax), Nnu)    # frequency bins
-# nu_ratio = nuarr[1]/nuarr[0]
-
-jdnuarr = np.zeros((Nt, Nr), dtype=float)    # volumetric emissivity at lamobs
-
+jdnuarr = np.zeros((Nt, Nr, Nthe), dtype=float)    # volumetric emissivity at lamobs
 
 # then we calculate the volumetric emissivity jdnuarr(t, r)
 # by integrating over dust size distribution
@@ -112,21 +103,23 @@ nuobs = const.C_LIGHT/(lamobs*1e-4)  # [Hz], observer's frequency
 h_nu_over_k = const.H_PLANCK*nuobs/const.K_B    # a useful constant
 for i in range(Nt):
     for j in range(Nr):
-        r = rarr[j]
-        j_pre_factor = 2*pi*const.H_PLANCK * nuobs/lamobs**2\
-                       * n0_over_nH * func_nH(r)
-        j_integ = 0.
-        a = asubarr[i, j]
-        while a <= amax:
-            k = round(log10(a/amin)/log10(a_ratio))
-            da = a * (sqrt(a_ratio) - 1./sqrt(a_ratio))
-            if Tarr[i, j, k] < 100:  # ignore extremely cold dust
+        for l in range(Nthe):
+            r = rarr[j]
+            the = thearr[l]
+            j_pre_factor = 2*pi*const.H_PLANCK * nuobs/lamobs**2\
+                           * n0_over_nH * func_nH(r, the)
+            j_integ = 0.
+            a = asubarr[i, j, l]
+            while a <= amax:
+                k = round(log10(a/amin)/log10(a_ratio))
+                da = a * (sqrt(a_ratio) - 1./sqrt(a_ratio))
+                if Tarr[i, j, l, k] < 100:  # ignore extremely cold dust
+                    a *= a_ratio
+                    continue
+                j_integ += da * a**-0.5 /(a + (lamobs/lam0)**2) \
+                           / (exp(h_nu_over_k/Tarr[i, j, l, k]) - 1)
                 a *= a_ratio
-                continue
-            j_integ += da * a**-0.5 /(a + (lamobs/lam0)**2) \
-                       / (exp(h_nu_over_k/Tarr[i, j, k]) - 1)
-            a *= a_ratio
-        jdnuarr[i, j] = j_pre_factor*j_integ
+            jdnuarr[i, j, l] = j_pre_factor*j_integ
 
 # then we calculate observed lightcurve taking into account light-travel delay
 Nmu = 100    # resolution of the bright stripe
@@ -154,26 +147,28 @@ for i_tobs in range(Ntobs):
             continue
         # print('mumax-mumin', mumax-mumin)
         dmu = (mumax - mumin)/Nmu
-        mu = mumin + dmu/2
-        mu_integ = 0.
-        mu_integ_xcentr = 0.
-        while mu < mumax:
-            if mu >= cos(max(1e-10, thej-theobs)):
-                tphimax = pi
-            else:
-                phi = acos((mu - cos(theobs)*cos(thej))/(sin(theobs)*sin(thej)))
-                if abs(sin(thej)*sin(phi)/sqrt(1-mu*mu)) > 1:  # avoid round-off errors
+        for k in range(Nthe):
+            the = thearr[k]
+            mu = mumin + dmu/2
+            mu_integ = 0.
+            mu_integ_xcentr = 0.
+            while mu < mumax:
+                if mu >= cos(max(1e-10, thej-theobs)):
                     tphimax = pi
                 else:
-                    tphimax = asin(sin(thej)*sin(phi)/sqrt(1-mu*mu))
-            t = tobs - r*const.pc2cm/const.C_LIGHT*(1-mu)
-            jdnu = jdnu_intp(t, j, jdnuarr, tarr)
-            mu_integ += dmu * jdnu * 2 * tphimax
-            mu_integ_xcentr += dmu * r * sqrt(1-mu*mu) * jdnu * 2 * sin(tphimax)
-            mu += dmu
-        # print(mu_integ)
-        Ldnu += 4*pi*dr*r*r * const.pc2cm**3 * mu_integ
-        Ldnu_xcentr += 4*pi*dr*r*r * const.pc2cm**3 * mu_integ_xcentr
+                    phi = acos((mu - cos(theobs)*cos(thej))/(sin(theobs)*sin(thej)))
+                    if abs(sin(thej)*sin(phi)/sqrt(1-mu*mu)) > 1:  # avoid round-off errors
+                        tphimax = pi
+                    else:
+                        tphimax = asin(sin(thej)*sin(phi)/sqrt(1-mu*mu))
+                t = tobs - r*const.pc2cm/const.C_LIGHT*(1-mu)
+                jdnu = jdnu_intp(t, j, k, jdnuarr, tarr)
+                mu_integ += dmu * jdnu * 2 * tphimax
+                mu_integ_xcentr += dmu * r * sqrt(1-mu*mu) * jdnu * 2 * sin(tphimax)
+                mu += dmu
+            # print(mu_integ)
+            Ldnu += 2*pi*dr*r*r * np.sin(the)*dthe*const.pc2cm**3 * mu_integ
+            Ldnu_xcentr += 2*pi*dr*r*r * np.sin(the)*dthe*const.pc2cm**3 * mu_integ_xcentr
     Ldnuarr[i_tobs] = Ldnu
     if Ldnu < 1e10:    # ~zero flux
         xcentrarr[i_tobs] = np.nan
