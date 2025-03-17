@@ -10,7 +10,7 @@ lamobs = float(sys.argv[2])     # [um] observer's wavelength
 theobs = float(sys.argv[3])      # [rad] observer's viewing angle wrt. jet axis
 
 # adjustable parameters
-thej = 4*pi/180     # [rad] jet opening angle
+thej = pi/2     # [rad] jet opening angle
 
 # fixed ones
 n0_over_nH = 1.45e-15    # dust number density over H number density

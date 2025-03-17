@@ -1,8 +1,8 @@
 import numpy as np
+import numpy as np
 import const
 from fpath import *
 from scipy.interpolate import interp1d
-from scipy.interpolate import RegularGridInterpolator
 from scipy.interpolate import griddata
 from math import pi, log10, sqrt, log, exp, sqrt, atan, cos, sin, acos, asin
 
@@ -32,9 +32,9 @@ r_ratio = rarr[1]/rarr[0]
 
 #THIS IS NEW
 themin, themax = 0.000001, pi    #theta array
-Nthe = 50
+Nthe = 5
 thearr = np.linspace(themin, themax, Nthe)
-Dthe = thearr[1]-thearr[0]
+dthe = thearr[1]-thearr[0]
 
 # min and max source frequencies
 numin, numax = 0.1/(const.erg2eV*const.H_PLANCK), 50/(const.erg2eV*const.H_PLANCK)
@@ -51,23 +51,18 @@ tarr += dt/2.
 Tarr = np.zeros((Nt, Nr, Nthe, Na), dtype=float)   # to store the dust temperature
 asubarr = np.zeros((Nt, Nr, Nthe), dtype=float)    # to store sublimation radii
 taudarr = np.zeros((Nnu, Nr, Nthe), dtype=float)   # dust extinction optical depth at each nu
-jdnuarr = np.zeros((Nt, Nr, Nthe), dtype=float)    # volumetric emissivity at lamobs
-
 
 def func_Lnu(t, nu):     # source spectrum and light curve
     if t < tmax:
         return LnuUVmax*(nu/nuUVmax)**((1 - p)/2)  # spectrum L_nu ~ nu^{(1-p)/2}
     return 0.
 
-
 def func_nH(r, the):      # gas density profile (r in pc)
     return nH0
-
 
 def func_Qabs(nu, a):      # absorption efficiency for grain size a [um]
     lam = const.C_LIGHT/nu * 1e4    # wavelength in um
     return 1./(1 + (lam/lam0)**2 / a)
-
 
 def func_T(qdot_h, aum):    # solve the heating and cooling balance for T
     y = qdot_h/(7.12576*aum**2)
@@ -77,31 +72,26 @@ def func_T(qdot_h, aum):    # solve the heating and cooling balance for T
     T3 = sqrt((2*y*y/3/xi)**(1./3) + (xi*y/18)**(1./3))
     return 1000*T3
 
-
-def jdnu_intp(t, j_r, jdnuarr):
-    # linear interpolation in time for a given r (given by index j_r)
-    i_floor = np.argmin(np.abs(t-tarr))
-    if t < tarr[i_floor] and i_floor != 0:
-        i_floor -= 1
-    if i_floor == Nt - 1:
-        i_floor -= 1
-    slope = (jdnuarr[i_floor+1, j_r] - jdnuarr[i_floor, j_r])\
-            /(tarr[i_floor+1] - tarr[i_floor])
-    return max(jdnuarr[i_floor, j_r] + slope * (t - tarr[i_floor]), 0)
-
-
 # compute cumulative number of H as a function of radius
-Nr_fine = int(Nr*10)
-rarr_fine = np.logspace(log10(rmin/10), log10(rmax), Nr_fine)
+fine_spacing = 10
+Nr_fine = int(Nr*fine_spacing)
+Nthe_fine = int(Nthe*fine_spacing)
+rarr_fine = np.logspace(log10(rmin/fine_spacing), log10(rmax), Nr_fine)
+thearr_fine = np.linspace(themin, themax, Nthe_fine)
 r_ratio_fine = rarr_fine[1]/rarr_fine[0]
-NHarr_fine = np.zeros(Nr_fine, dtype=float)
-NH = 0.     # total H number
-for i in range(Nr_fine):
-    r = rarr_fine[i]
-    dr = r * (sqrt(r_ratio_fine) - 1/sqrt(r_ratio_fine))
-    NH += 4*pi*r*r*dr*const.pc2cm**3 * func_nH(r)
-    NHarr_fine[i] = NH
-r_NH_intp = interp1d(rarr_fine, NHarr_fine, fill_value='extrapolate')
+dthe_fine = dthe/fine_spacing
+NHarr_fine = np.zeros((Nr_fine, Nthe_fine), dtype=float)
+interp_fns = np.zeros(Nthe_fine, dtype=object)
+for i in range(Nthe_fine):
+    NH = 0.     # total H number
+    the = thearr_fine[i]
+    for j in range(Nr_fine):
+        r = rarr_fine[j]
+        dr = r * (sqrt(r_ratio_fine) - 1/sqrt(r_ratio_fine))
+        NH += 2*pi*r*r*dr*np.sin(the)*dthe_fine*const.pc2cm**3 * func_nH(r, the)
+        NHarr_fine[j][i] = NH
+    r_NH_intp = interp1d(rarr_fine, NHarr_fine[:,i], fill_value='extrapolate')
+    interp_fns[i] = r_NH_intp
 
 # compute cumulative number of ionizing photons as a function of time
 Nt_fine = int(Nt*20)
@@ -126,75 +116,78 @@ for i in range(Nt_fine):
     Nionarr_fine[i] = Nion
 Nion_t_intp = interp1d(Nionarr_fine, tarr_fine, fill_value='extrapolate')
 
-
+# calculate dust temperature at a given time
 # calculate dust temperature at a given time
 def calculate_all_T(t, i_t, rion, Tarr, asubarr, taudarr):
-    for j in range(Nr):
-        r = rarr[j]
-        asub = amin
-        for k in range(Na):
-            a = aarr[k]
-            # calculate heating rate divided by pi*a^2
-            qdot_h_over_pia2 = 0.
-            for m in range(Nnu):
-                nu = nuarr[m]
-                dnu = nu * (sqrt(nu_ratio) - 1./sqrt(nu_ratio))
-                if r < rion and nu > nu_ion_min:
-                    break   # no photons above 13.6 eV ar r > rion
-                qdot_h_over_pia2 += dnu * func_Lnu(t, nu) * exp(-taudarr[m, j])\
-                                    /(4*pi*r*r*const.pc2cm**2) * func_Qabs(nu, a)
-            qdot_h = qdot_h_over_pia2 * pi * a**2 * 1e-8    # heating rate [cgs]
-            T = func_T(qdot_h, a)
-            Tsub = 2.33e3 * (1 - 0.033*log(t/100./a))
-            if T > Tsub:    # grains in this size bin have already evaporated
-                asub = min(max(asub, a), amax)
-                Tarr[i_t, j, k] = 0.   # no emission from this size bin
-            else:   # grains survive
-                Tarr[i_t, j, k] = T
-        if i_t == 0:
-            asubarr[i_t, j] = asub
-        else:   # make sure asub does not decrease with time
-            asubarr[i_t, j] = max(asub, asubarr[i_t-1, j])
-    return
+    for l in range(Nthe):
+        for j in range(Nr):
+            r = rarr[j]
+            asub = amin
+            for k in range(Na):
+                a = aarr[k]
+                # calculate heating rate divided by pi*a^2
+                qdot_h_over_pia2 = 0.
+                for m in range(Nnu):
+                    nu = nuarr[m]
+                    dnu = nu * (sqrt(nu_ratio) - 1./sqrt(nu_ratio))
+                    if r < rion and nu > nu_ion_min:
+                        break   # no photons above 13.6 eV ar r > rion
+                    qdot_h_over_pia2 += dnu * func_Lnu(t, nu) * exp(-taudarr[m, j, l])\
+                                        /(4*pi*r*r*const.pc2cm**2) * func_Qabs(nu, a)
+                qdot_h = qdot_h_over_pia2 * pi * a**2 * 1e-8    # heating rate [cgs]
+                T = func_T(qdot_h, a)
+                Tsub = 2.33e3 * (1 - 0.033*log(t/100./a))
+                if T > Tsub:    # grains in this size bin have already evaporated
+                    asub = min(max(asub, a), amax)
+                    Tarr[i_t, j, l, k] = 0.   # no emission from this size bin
+                else:   # grains survive
+                    Tarr[i_t, j, l, k] = T
+            if i_t == 0:
+                asubarr[i_t, j, l] = asub
+            else:   # make sure asub does not decrease with time
+                asubarr[i_t, j, l] = max(asub, asubarr[i_t-1, j, l])
+    return      
 
-
-def calculate_taudarr(i_t, asubarr, taudarr):
+def calculate_taudarr(i_t, asubarr, taudarr, thearr):
     for m in range(Nnu):
         nu = nuarr[m]
         lam = const.C_LIGHT/nu*1e4   # in um
         xmax = amax * (lam0/lam)**2
         tau_pre_factor = 2*sqrt(2)*pi*1e-8*n0_over_nH*lam0/lam
-        taud = 0.
-        for j in range(Nr):
-            r = rarr[j]
-            dr = r * (sqrt(r_ratio) - 1./sqrt(r_ratio))
-            xsub = asubarr[i_t, j] * (lam0/lam)**2
-            taud += tau_pre_factor * dr * const.pc2cm * func_nH(r) \
-                    * (atan(sqrt(0.5*xmax)) - atan(sqrt(0.5*xsub)))
-            taudarr[m, j] = taud
+        for k in range(Nthe):
+            taud = 0.
+            for j in range(Nr):
+                r = rarr[j]
+                the = thearr[k]
+                dr = r * (sqrt(r_ratio) - 1./sqrt(r_ratio))
+                xsub = asubarr[i_t, j, k] * (lam0/lam)**2
+                taud += tau_pre_factor * dr * const.pc2cm * func_nH(r, the) \
+                        * (atan(sqrt(0.5*xmax)) - atan(sqrt(0.5*xsub)))
+                taudarr[m, j, k] = taud
     return
-
 
 tol = 0.01  # tolerance for asubarr
 for i in range(Nt):
-    t = tarr[i]
-    Nion = Nion_t_intp(t)
-    rion = r_NH_intp(Nion)  # ionization radius
-    taudarr.fill(0)    # first iteration, no dust extinction
-    calculate_all_T(t, i, rion, Tarr, asubarr, taudarr)
-    frac_diff = 1.  # convergence criterion
-    n_iter = 0.     # number of iterations
-    while frac_diff > tol:
-        n_iter += 1
-        asubarr_old = np.copy(asubarr[i])
-        # we go back to calculate dust extinction optical depth
-        calculate_taudarr(i, asubarr, taudarr)
-        # then calculate the whole temperature again
+    for k in range(Nthe):
+        t = tarr[i]
+        the = thearr[k]
+        Nion = Nion_t_intp(t)
+        rion = interp_fns[int(k*fine_spacing)](Nion)  # ionization radius
+        taudarr.fill(0)    # first iteration, no dust extinction
         calculate_all_T(t, i, rion, Tarr, asubarr, taudarr)
-        frac_diff = 0.
-        for j in range(Nr):
-            frac_diff = max(frac_diff, abs(asubarr_old[j]/asubarr[i, j] - 1))
-    print('t=%.1f' % t, '%d iterations' % n_iter)
+        frac_diff = 1.  # convergence criterion
+        n_iter = 0.     # number of iterations
+        while frac_diff > tol:
+            n_iter += 1
+            asubarr_old = np.copy(asubarr[i])
+            # we go back to calculate dust extinction optical depth
+            calculate_taudarr(i, asubarr, taudarr, thearr)
+            # then calculate the whole temperature again
+            calculate_all_T(t, i, rion, Tarr, asubarr, taudarr)
+            frac_diff = 0.
+            for j in range(Nr):
+                frac_diff = max(frac_diff, abs(asubarr_old[j, k]/asubarr[i, j, k] - 1))
+        print('t=%.1f' % t, '%d iterations' % n_iter)
 
 # write the results into files: Tarr, asubarr
 savelist = ['Td', 'asub']
@@ -204,6 +197,7 @@ for i_file in range(len(savelist)):
         if savelist[i_file] == 'Td':
             f.write('tmin\ttmax\tNt\t%.8e\t%.8e\t%d\tlinear' % (tmin, tmax, Nt))
             f.write('\nrmin\trmax\tNr\t%.8e\t%.8e\t%d\tlog' % (rmin, rmax, Nr))
+            f.write('\nthemin\tthemax\tNthe\t%.8e\t%.8e\t%d\tlinear' % (themin, themax, Nthe))
             f.write('\namin\tamax\tNa\t%.8e\t%.8e\t%d\tlog' % (amin, amax, Na))
             f.write('\n')
             for i in range(Nt):
@@ -211,19 +205,24 @@ for i_file in range(len(savelist)):
                 f.write('\ni=%d, t=%.8e' % (i, t))
                 for j in range(Nr):
                     f.write('\n')
-                    for k in range(Na):
-                        if k == 0:
-                            f.write('%.8e' % Tarr[i, j, k])
-                        else:
-                            f.write('\t%.8e' % Tarr[i, j, k])
+                    for l in range(Nthe):
+                        f.write('\n')
+                        for k in range(Na):
+                            if k == 0:
+                                f.write('%.8e' % Tarr[i, j, l, k])
+                            else:
+                                f.write('\t%.8e' % Tarr[i, j, l, k])
         elif savelist[i_file] == 'asub':
             f.write('tmin\ttmax\tNt\t%.8e\t%.8e\t%d\tlog' % (tmin, tmax, Nt))
             f.write('\nrmin\trmax\tNr\t%.8e\t%.8e\t%d\tlog' % (rmin, rmax, Nr))
+            f.write('\nthemin\tthemax\tNthe\t%.8e\t%.8e\t%d\tlinear' % (themin, themax, Nthe))
             f.write('\n')
             for i in range(Nt):
                 f.write('\n')
                 for j in range(Nr):
-                    if j == 0:
-                        f.write('%.8e' % asubarr[i, j])
-                    else:
-                        f.write('\t%.8e' % asubarr[i, j])
+                    f.write('\n')
+                    for l in range(Nthe):
+                        if l == 0:
+                            f.write('%.8e' % asubarr[i, j, l])
+                        else:
+                            f.write('\t%.8e' % asubarr[i, j, l])
