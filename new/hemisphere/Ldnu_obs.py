@@ -25,8 +25,10 @@ Ldnuarr = np.zeros(Ntobs, dtype=float)
 xcentrarr = np.zeros(Ntobs, dtype=float)
 
 def func_nH(r, the):      # gas density profile (r in pc)
-    index = int(the/np.pi *10)
-    return nH0*(index % 2)
+    if the<np.pi/2:
+        return nH0
+    else:
+        return 0
 
 def jdnu_intp(t, j_r, j_the, jdnuarr, tarr):
     # linear interpolation in time for a given r (given by index j_r)

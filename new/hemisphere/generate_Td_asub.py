@@ -58,8 +58,10 @@ def func_Lnu(t, nu):     # source spectrum and light curve
     return 0.
     
 def func_nH(r, the):      # gas density profile (r in pc)
-    index = int(the/np.pi *10)
-    return nH0*(index % 2)
+    if the < np.pi/2:
+        return nH0
+    else:
+        return 0
 
 def func_Qabs(nu, a):      # absorption efficiency for grain size a [um]
     lam = const.C_LIGHT/nu * 1e4    # wavelength in um
