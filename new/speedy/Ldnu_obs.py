@@ -101,25 +101,43 @@ jdnuarr = np.zeros((Nt, Nr, Nthe), dtype=float)    # volumetric emissivity at la
 # by integrating over dust size distribution
 nuobs = const.C_LIGHT/(lamobs*1e-4)  # [Hz], observer's frequency
 h_nu_over_k = const.H_PLANCK*nuobs/const.K_B    # a useful constant
-for i in range(Nt):
-    for j in range(Nr):
-        for l in range(Nthe):
-            r = rarr[j]
-            the = thearr[l]
-            j_pre_factor = 2*pi*const.H_PLANCK * nuobs/lamobs**2\
-                           * n0_over_nH * func_nH(r, the)
-            j_integ = 0.
-            a = asubarr[i, j, l]
-            while a <= amax:
-                k = round(log10(a/amin)/log10(a_ratio))
-                da = a * (sqrt(a_ratio) - 1./sqrt(a_ratio))
-                if Tarr[i, j, l, k] < 100:  # ignore extremely cold dust
-                    a *= a_ratio
-                    continue
-                j_integ += da * a**-0.5 /(a + (lamobs/lam0)**2) \
-                           / (exp(h_nu_over_k/Tarr[i, j, l, k]) - 1)
-                a *= a_ratio
-            jdnuarr[i, j, l] = j_pre_factor*j_integ
+
+# Precompute logarithmic grain size array
+num_a = int(np.floor(np.log(amax / amin) / np.log(a_ratio))) + 1
+a_values = amin * a_ratio ** np.arange(num_a)
+da_values = a_values * (np.sqrt(a_ratio) - 1. / np.sqrt(a_ratio))
+k_values = np.round(np.log10(a_values / amin) / np.log10(a_ratio)).astype(int)
+
+# Broadcast r and the arrays
+r = rarr[:, None]  # shape (Nr, 1)
+the = thearr[None, :]  # shape (1, Nthe)
+#nH_vals = func_nH(r, the)  # shape (Nr, Nthe)
+nH_vals = np.ones((Nr, Nthe)) * nH0 #TEMP
+j_pre_factor = 2 * np.pi * const.H_PLANCK * nuobs / lamobs**2 * n0_over_nH * nH_vals  # shape (Nr, Nthe)
+
+# Broadcast j_pre_factor to (Nt, Nr, Nthe)
+j_pre_factor = j_pre_factor[None, :, :]  # shape (Nt, Nr, Nthe)
+
+# Create container
+j_integ = np.zeros((Nt, Nr, Nthe))
+
+# Loop over precomputed grain sizes
+for idx_a, (a, da, k) in enumerate(zip(a_values, da_values, k_values)):
+    # Build a mask for where a >= asubarr[i, j, l]
+    a_mask = a >= asubarr  # shape (Nt, Nr, Nthe)
+
+    # Get T values at this grain size
+    Tvals = Tarr[:, :, :, k]  # shape (Nt, Nr, Nthe)
+    valid_mask = (Tvals >= 100) & a_mask
+
+    term = np.zeros_like(Tvals)
+    exp_term = np.exp(h_nu_over_k / Tvals[valid_mask]) - 1
+    term[valid_mask] = da * a**-0.5 / (a + (lamobs / lam0)**2) / exp_term
+
+    j_integ += term
+
+# Final emission coefficient
+jdnuarr = j_pre_factor * j_integ
 
 # then we calculate observed lightcurve taking into account light-travel delay
 Nmu = 100    # resolution of the bright stripe
